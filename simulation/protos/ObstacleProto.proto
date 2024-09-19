@@ -1,0 +1,18 @@
+#VRML_SIM R2023b utf8
+# Describe the functionality of your PROTO here.
+# template language: javascript
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/drinks/protos/Can.proto"
+
+
+PROTO ObstacleProto [
+  field SFVec3f translation 0 0 0 # Is `Pose.translation`.
+  field SFString name "e-puck" # Is `Solid.name`.
+]
+{
+  Can {
+  translation IS translation
+  name IS name
+ 
+}
+}

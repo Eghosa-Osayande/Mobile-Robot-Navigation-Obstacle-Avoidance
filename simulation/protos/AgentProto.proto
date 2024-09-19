@@ -1,0 +1,46 @@
+#VRML_SIM R2023b utf8
+# Describe the functionality of your PROTO here.
+# template language: javascript
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+
+PROTO AgentProto [
+  field SFVec3f translation 0 0 0 # Is `Pose.translation`.
+  field SFRotation rotation 0 0 1 0 # Is `Pose.rotation`.
+  field SFString name "e-puck" # Is `Solid.name`.
+  field SFString controller "<generic>"
+  field MFFloat battery [1000 1000 1] 
+]
+{
+    E-puck {
+      controller IS controller
+      translation IS translation
+      rotation IS rotation
+      battery IS battery
+      name IS name
+      supervisor TRUE
+      distance_sensor_numberOfRays 50
+      turretSlot [
+        Receiver {
+          name "receiver1"
+          type "radio"
+          channel 0
+        },
+        Emitter {
+          name "emitter1"
+          type "radio"
+          channel 1
+        },
+        GPS{
+          name "gps"
+        },
+        Compass{
+          name "compass"
+          xAxis TRUE
+          yAxis TRUE
+          zAxis TRUE
+        }
+      ]
+  }
+    
+}

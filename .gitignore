@@ -1,0 +1,7 @@
+.env
+simulation/controllers/controller/
+.ipynb_checkpoints/
+refs/
+.arena.wbproj
+.DS_Store
+__pycache__

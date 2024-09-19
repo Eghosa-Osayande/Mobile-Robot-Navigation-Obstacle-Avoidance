@@ -1,0 +1,9 @@
+numpy
+pandas
+scipy
+matplotlib
+ipykernel
+requests
+pandasql
+gymnasium
+stable-baselines3
