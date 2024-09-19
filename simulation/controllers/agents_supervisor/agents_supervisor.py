@@ -153,13 +153,16 @@ class Agents_Supervisor:
     def reset(self):
         for rowCount in range(self.n_robots):
             node = self.supervisor.getFromDef(f"robot{rowCount}")
-            node.remove()
+            if node is not None:
+                node.remove()
             node = self.supervisor.getFromDef(f"target{rowCount}")
-            node.remove()
+            if node is not None:
+                node.remove()
             
         for rowCount in range(len(self.obstacle_positions)):
             node = self.supervisor.getFromDef(f"obstacle{rowCount}")
-            node.remove()
+            if node is not None:
+                node.remove()
         
         self.step()
         self.started_at = self.supervisor.getTime()
@@ -171,8 +174,8 @@ class Agents_Supervisor:
         controllerFile = "agent_controller"
 
         rowCount = 0
-        for (x, y), (tx, ty), (obx, oby) in zip(
-            self.robot_positions, self.target_positions, self.obstacle_positions
+        for (x, y), (tx, ty) in zip(
+            self.robot_positions, self.target_positions
         ):
 
             children_field.importMFNodeFromString(
@@ -431,9 +434,9 @@ robot = Supervisor()
 
 supervisor = Agents_Supervisor(
     robot,
-    4,
-    np.asarray([1, 1]),
-    n_obstacles=10,
+    10,
+    np.asarray([.7, .5]),
+    n_obstacles=0,
     cache_positions=not True,
     override_positions= not True,
 )
