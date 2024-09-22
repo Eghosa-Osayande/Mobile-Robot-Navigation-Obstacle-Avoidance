@@ -3,20 +3,21 @@
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/RectangleArena.proto"
-
 IMPORTABLE EXTERNPROTO "../protos/TargetProto.proto"
 IMPORTABLE EXTERNPROTO "../protos/AgentProto.proto"
 IMPORTABLE EXTERNPROTO "../protos/ObstacleProto.proto"
 
 WorldInfo {
+  optimalThreadCount 8
 }
 Viewpoint {
   orientation -0.5773502691896258 0.5773502691896258 0.5773502691896258 2.0944
-  position -6.873862336574464e-06 -6.873881774616378e-06 1.614919062218115
+  position -6.873862336574464e-06 -6.873881774616378e-06 2
 }
 TexturedBackground {
 }
 TexturedBackgroundLight {
+  castShadows FALSE
 }
 DEF FLOOR RectangleArena {
   wallHeight 1e-100
@@ -24,16 +25,11 @@ DEF FLOOR RectangleArena {
 DEF BOT Robot {
   children [
     Emitter {
-      type "radio"
-      channel 0
-    },
+    }
     Receiver {
-      type "radio"
       channel 1
     }
   ]
   controller "agents_supervisor"
   supervisor TRUE
 }
-
-

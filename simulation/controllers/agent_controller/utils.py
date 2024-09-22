@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from controller import Supervisor
+import heapq
 
 
 def is_coordinate_equal(coordinate1, coordinate2, matching_accuracy=0):
@@ -170,3 +171,75 @@ def get_alignment_to_target(orientation, current_coordinate, destination_coordin
     )
 
     return np.degrees(theta) - orientation
+
+def apply_offset(pos,offset):
+    x,y=pos
+    return(int((x + offset)), int((y + offset)))
+
+# A* Algorithm
+def a_star(start, goal, grid):
+    # Helper functions
+    
+    grid_size = grid.shape
+
+    def heuristic(a, b):
+        # return abs(a[0] - b[0]) + abs(a[1] - b[1])
+        return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+    def get_neighbors(pos):
+        neighbors = [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0),
+            # (1,1),
+            # (-1,-1),
+            # (-1,1),
+            # (1,-1),
+        ]  # 4-way movement
+        valid_neighbors = []
+        for dx, dy in neighbors:
+            newx, newy = pos[0] + dx, pos[1] + dy
+            if (
+                0 <= newx < grid_size[0]
+                and 0 <= newy < grid_size[1]
+                and grid[newx, newy] == 0
+            ):
+                valid_neighbors.append((newx, newy))
+        return valid_neighbors
+
+    # Initialization
+    frontier = []
+    heapq.heappush(frontier, (0, start))
+    came_from = {start: None}
+    cost_so_far = {start: 0}
+    
+    # Algorithm loop
+    while frontier:
+        current_cost, current = heapq.heappop(frontier)
+
+        if current == goal:
+            break
+
+        for next in get_neighbors(current):
+            new_cost = cost_so_far[current] + 1  # Assuming uniform cost
+            if next not in cost_so_far or new_cost < cost_so_far[next]:
+                cost_so_far[next] = new_cost
+                priority = new_cost + heuristic(goal, next)
+                heapq.heappush(frontier, (priority, next))
+                came_from[next] = current
+
+    
+    
+    # Reconstruct path
+    current = goal
+    path = []
+    while current != start:
+        path.append(current)
+        current = came_from.get(current)
+        if current is None:
+            return []
+    path.append(start)
+    path.reverse()
+    return path
+

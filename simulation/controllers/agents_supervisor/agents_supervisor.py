@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 import json
 from controller import Supervisor, Emitter, Receiver
-import threading
+from PIL import Image, ImageFont, ImageDraw
 
 
 robots_pos_override = [
@@ -38,7 +38,9 @@ df = pd.DataFrame(
 )
 
 
-def generate_random_coordinates(x_min, x_max, y_min, y_max, n=1, threshold=0.08):
+def generate_random_coordinates(
+    x_min, x_max, y_min, y_max, n=1, threshold=0.08, padding=0
+):
     """
     Generate random (x, y) coordinates within specified bounds, ensuring no two points are closer than the threshold.
 
@@ -54,11 +56,10 @@ def generate_random_coordinates(x_min, x_max, y_min, y_max, n=1, threshold=0.08)
     - coordinates: array of shape (n, 2) containing generated (x, y) coordinates
     """
     coordinates = []
-
     while len(coordinates) < n:
         # Generate a new candidate point
-        x_new = np.random.uniform(x_min, x_max)
-        y_new = np.random.uniform(y_min, y_max)
+        x_new = np.random.uniform(x_min + padding, x_max - padding)
+        y_new = np.random.uniform(y_min + padding, y_max - padding)
         new_point = np.array([x_new, y_new])
 
         # Check distance to all existing points
@@ -67,8 +68,40 @@ def generate_random_coordinates(x_min, x_max, y_min, y_max, n=1, threshold=0.08)
             for existing_point in coordinates
         ):
             coordinates.append(new_point)
+    r=np.array(coordinates)
+    np.random.shuffle(r)
+    return r
 
-    return np.array(coordinates)
+
+def sentence_to_array(sentence, size):
+    font = ImageFont.load_default()
+    image = Image.new("1", size, 1)  # '1' for 1-bit pixels, black and white
+    draw = ImageDraw.Draw(image)
+    draw.text((0, 0), sentence, font=font)
+    led_array = np.array(image)
+    led_array = np.where(led_array == 1, 0, 1)
+    return led_array[::-1, :]
+
+
+def sentence_to_targets(
+    sentence,
+    target_size=[1, 1],
+    origin_offest=[0, 0],
+):
+    size = [50, 12]
+    unit_map = sentence_to_array(sentence, size)
+    targets = []
+
+    for index, row in enumerate(unit_map):
+        height_offset = index * target_size[1]
+        height = height_offset + (target_size[1] / 2) + origin_offest[1]
+        for index, column in enumerate(row):
+            width_offset = index * target_size[0]
+            width = width_offset + (target_size[0] / 2) + origin_offest[0]
+            if column:
+                targets.append([width, height])
+
+    return np.array(targets)
 
 
 class Agents_Supervisor:
@@ -89,6 +122,7 @@ class Agents_Supervisor:
 
     approach: str = "None"
     started_at: float = 0
+    show_targets = True
 
     def __init__(
         self,
@@ -96,11 +130,13 @@ class Agents_Supervisor:
         n_robots: int,
         arena_size: np.ndarray,
         n_obstacles: int = 0,
+        show_targets=True,
         **kwargs,
     ):
         self.supervisor = supervisor
         self.n_robots = n_robots
         self.arena_size = arena_size
+        self.show_targets = show_targets
 
         self.timestep = int(self.supervisor.getBasicTimeStep())
 
@@ -108,7 +144,12 @@ class Agents_Supervisor:
         y_min, y_max = np.asarray((-1, 1)) * (arena_size[1] / 2)
 
         cords = generate_random_coordinates(
-            x_min, x_max, y_min, y_max, 2 * n_robots + n_obstacles
+            x_min,
+            x_max,
+            y_min,
+            y_max,
+            2 * n_robots + n_obstacles,
+            padding=0.0,
         )
 
         self.robot_positions = cords[:n_robots, :]
@@ -123,12 +164,24 @@ class Agents_Supervisor:
             self.target_positions = np.array(targets_pos_override)
             self.obstacle_positions = np.array(obstacle_pos_override)
 
+        if (robot_positions := kwargs.get("robot_positions")) is not None:
+            print(robot_positions)
+            self.robot_positions = np.array(robot_positions)
+
+        if (target_positions := kwargs.get("target_positions")) is not None:
+            self.target_positions = np.array(target_positions)
+
+        if (obstacle_positions := kwargs.get("obstacle_positions")) is not None:
+            self.obstacle_positions = np.array(obstacle_positions)
+
         if kwargs.get("cache_positions") == True:
             with open("positions_cache.py", "a") as fd:
                 fd.writelines(
                     [
-                        "robots = " + json.dumps(self.robot_positions.tolist()) + "\n",
-                        "targets = "
+                        "robot_positions = "
+                        + json.dumps(self.robot_positions.tolist())
+                        + "\n",
+                        "target_positions = "
                         + json.dumps(self.target_positions.tolist())
                         + "\n\n",
                     ]
@@ -151,19 +204,21 @@ class Agents_Supervisor:
         return self.supervisor.step(self.timestep)
 
     def reset(self):
-        for rowCount in range(self.n_robots):
+        for rowCount in range(len(self.target_positions)):
             node = self.supervisor.getFromDef(f"robot{rowCount}")
             if node is not None:
                 node.remove()
-            node = self.supervisor.getFromDef(f"target{rowCount}")
-            if node is not None:
-                node.remove()
-            
+        if self.show_targets:
+            for rowCount in range(len(self.robot_positions)):
+                node = self.supervisor.getFromDef(f"target{rowCount}")
+                if node is not None:
+                    node.remove()
+
         for rowCount in range(len(self.obstacle_positions)):
             node = self.supervisor.getFromDef(f"obstacle{rowCount}")
             if node is not None:
                 node.remove()
-        
+
         self.step()
         self.started_at = self.supervisor.getTime()
 
@@ -174,9 +229,7 @@ class Agents_Supervisor:
         controllerFile = "agent_controller"
 
         rowCount = 0
-        for (x, y), (tx, ty) in zip(
-            self.robot_positions, self.target_positions
-        ):
+        for x, y in self.robot_positions:
 
             children_field.importMFNodeFromString(
                 -1,
@@ -189,17 +242,22 @@ class Agents_Supervisor:
                 }}
                 """,
             )
-            
-            children_field.importMFNodeFromString(
-                -1,
-                f"""
-                    DEF target{rowCount} TargetProto {{
-                        name "target{rowCount}"
-                        translation {tx} {ty} 0.1
-                    }}
-                """,
-            )
             rowCount += 1
+
+        rowCount = 0
+        if self.show_targets:
+            for tx, ty in self.target_positions:
+
+                children_field.importMFNodeFromString(
+                    -1,
+                    f"""
+                        DEF target{rowCount} TargetProto {{
+                            name "target{rowCount}"
+                            translation {tx} {ty} 0.1
+                        }}
+                    """,
+                )
+                rowCount += 1
 
         rowCount = 0
         for obx, oby in self.obstacle_positions:
@@ -212,7 +270,7 @@ class Agents_Supervisor:
                     }}
                 """,
             )
-            
+
             rowCount += 1
         self.step()
 
@@ -430,18 +488,19 @@ def simulate_task_assignments(
     supervisor.step()
 
 
+arena_size = [1, 1]
 robot = Supervisor()
-
+np.random.seed(0)
 supervisor = Agents_Supervisor(
     robot,
-    10,
-    np.asarray([.7, .5]),
-    n_obstacles=0,
-    cache_positions=not True,
-    override_positions= not True,
+    n_robots=1,
+    arena_size=np.asarray(arena_size),
+    n_obstacles=10,
+    cache_positions=True,
+    # robot_positions=[[-0.224254,-0.463529]],
+    # target_positions=[[-0.301366,0.157189]],
+    # obstacle_positions=[[.0,.0]],
+    # show_targets=False,
 )
-simulate_task_assignments(
-    supervisor,
-    csv_file="eval.csv",
-    save_csv=True,
-)
+
+supervisor.run_hungarian()

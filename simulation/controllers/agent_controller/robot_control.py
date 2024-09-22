@@ -117,8 +117,9 @@ class RobotControl(RobotBase):
         self.orientation=oo
 
     def move(self, left_velocity, right_velocity):
-        self.left_wheel.setVelocity(left_velocity * self.speed)
-        self.right_wheel.setVelocity(right_velocity * self.speed)
+        max_v=6.28
+        self.left_wheel.setVelocity(np.clip(left_velocity * self.speed,-max_v,max_v))
+        self.right_wheel.setVelocity(np.clip(right_velocity * self.speed,-max_v,max_v))
         self.robot_step()
         self.set_position_and_rotation()
 

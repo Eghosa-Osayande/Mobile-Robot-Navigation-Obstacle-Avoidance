@@ -9,17 +9,15 @@ PROTO AgentProto [
   field SFRotation rotation 0 0 1 0 # Is `Pose.rotation`.
   field SFString name "e-puck" # Is `Solid.name`.
   field SFString controller "<generic>"
-  field MFFloat battery [1000 1000 1] 
 ]
 {
     E-puck {
       controller IS controller
       translation IS translation
       rotation IS rotation
-      battery IS battery
       name IS name
       supervisor TRUE
-      distance_sensor_numberOfRays 50
+      distance_sensor_numberOfRays 200
       turretSlot [
         Receiver {
           name "receiver1"
