@@ -9,6 +9,7 @@ PROTO AgentProto [
   field SFRotation rotation 0 0 1 0 # Is `Pose.rotation`.
   field SFString name "e-puck" # Is `Solid.name`.
   field SFString controller "<generic>"
+  field SFString customData "" # Is `Robot.customData`.
 ]
 {
     E-puck {
@@ -16,19 +17,11 @@ PROTO AgentProto [
       translation IS translation
       rotation IS rotation
       name IS name
-      supervisor TRUE
+      customData IS customData
+      supervisor FALSE
       distance_sensor_numberOfRays 200
+      emitter_channel  1 
       turretSlot [
-        Receiver {
-          name "receiver1"
-          type "radio"
-          channel 0
-        },
-        Emitter {
-          name "emitter1"
-          type "radio"
-          channel 1
-        },
         GPS{
           name "gps"
         },

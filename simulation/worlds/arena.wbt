@@ -24,9 +24,8 @@ DEF FLOOR RectangleArena {
 }
 DEF BOT Robot {
   children [
-    Emitter {
-    }
     Receiver {
+      name  "receiver"
       channel 1
     }
   ]

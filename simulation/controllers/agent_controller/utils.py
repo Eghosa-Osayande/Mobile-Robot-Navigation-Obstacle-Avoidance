@@ -18,11 +18,13 @@ def is_coordinate_equal(coordinate1, coordinate2, matching_accuracy=0):
     - position_error: tuple, the absolute difference in the x and y coordinates
     """
 
-    is_equal = math.fabs(coordinate1[0] - coordinate2[0]) < matching_accuracy and math.fabs(coordinate1[1] - coordinate2[1]) < matching_accuracy
+    is_equal = (
+        math.fabs(coordinate1[0] - coordinate2[0]) < matching_accuracy
+        and math.fabs(coordinate1[1] - coordinate2[1]) < matching_accuracy
+    )
 
     position_error = math.sqrt(
-        (coordinate1[0] - coordinate2[0]) ** 2 +
-        (coordinate1[1] - coordinate2[1]) ** 2
+        (coordinate1[0] - coordinate2[0]) ** 2 + (coordinate1[1] - coordinate2[1]) ** 2
     )
 
     return is_equal, position_error
@@ -58,39 +60,42 @@ def calc_distance(current_coordinate, destination_coordinate):
         + math.pow(destination_coordinate[1] - current_coordinate[1], 2)
     )
 
+
 def angles_to_rotation(phi, theta, psi):
-                
+
     angs = np.radians((phi, theta, psi))
-        
+
     maxang = np.max(np.abs(angs))
-        
+
     if maxang == 0:
-                
+
         return [0, 0, 1, 0]
-        
+
     signs = np.array(list(-1 if ang < 0 else +1 for ang in angs))
-                
+
     fracs = np.sqrt(np.abs(angs) / maxang)
-        
+
     rs = signs * fracs
-        
+
     return [rs[0], rs[1], rs[2], maxang]
+
 
 def anticlockwise_difference(start, end):
     # Normalize both angles to be within -180 to 180 degrees
     start = (start + 180) % 360 - 180
     end = (end + 180) % 360 - 180
-    
+
     # Calculate the direct difference
     difference = end - start
-    
+
     # Adjust difference for anticlockwise motion if necessary
     if difference < 0:
         difference += 360
-    
+
     return difference
 
-def show_target(robot:Supervisor,destinationCoordinates):
+
+def show_target(robot: Supervisor, destinationCoordinates):
     root_node = robot.getRoot()
     children_field = root_node.getField("children")
     children_field.importMFNodeFromString(
@@ -118,6 +123,7 @@ def insert_obstacle(robot: Supervisor, destinationCoordinates):
     )
     robot.step()
 
+
 def map_sensor_value(sensor_value):
     # Define the lookup table as a list of tuples (sensor value, sensor reading, real value)
     lookup_table = [
@@ -130,10 +136,8 @@ def map_sensor_value(sensor_value):
         (0.04, 158.03, 0.0287),
         (0.05, 120, 0.04225),
         (0.06, 104.09, 0.03065),
-        (0.07, 67.19, 0.04897)
+        (0.07, 67.19, 0.04897),
     ]
-    
-
 
     # If the sensor value is exactly one of the known values, return the corresponding real value
     for i in range(len(lookup_table)):
@@ -142,15 +146,16 @@ def map_sensor_value(sensor_value):
 
     # Otherwise, perform linear interpolation between the closest known points
     for i in range(len(lookup_table) - 1):
-        if lookup_table[i][1] >= sensor_value >= lookup_table[i+1][1]:
+        if lookup_table[i][1] >= sensor_value >= lookup_table[i + 1][1]:
             # Linear interpolation formula
             x0, y0 = lookup_table[i][1], lookup_table[i][2]
-            x1, y1 = lookup_table[i+1][1], lookup_table[i+1][2]
+            x1, y1 = lookup_table[i + 1][1], lookup_table[i + 1][2]
             return y0 + (sensor_value - x0) * (y1 - y0) / (x1 - x0)
 
     # If the sensor value is outside the known range, return None or handle it as needed
-    print("wtf",sensor_value)
+    print("wtf", sensor_value)
     return 0
+
 
 def calculate_distance(point1, point2):
     # Convert points to NumPy arrays
@@ -163,7 +168,6 @@ def calculate_distance(point1, point2):
     return np.abs(distance)
 
 
-
 def get_alignment_to_target(orientation, current_coordinate, destination_coordinate):
     theta = np.arctan2(
         destination_coordinate[1] - current_coordinate[1],
@@ -172,14 +176,55 @@ def get_alignment_to_target(orientation, current_coordinate, destination_coordin
 
     return np.degrees(theta) - orientation
 
-def apply_offset(pos,offset):
-    x,y=pos
-    return(int((x + offset)), int((y + offset)))
+
+def apply_transformation(cord, offset=0, scale=1):
+    x, y = cord
+
+    pos = (int((x + offset) // scale), int((y + offset) // scale))
+
+    remainders = ((x + offset) % scale, (y + offset) % scale)
+    return pos, remainders
+
+
+def revert_transformation(cord, offset=0, scale=1, remainders=(0, 0)):
+    xx = (cord[0] * scale) - offset + remainders[0]
+    yy = (cord[1] * scale) - offset + remainders[1]
+    return xx, yy
+
+def generate_sub_moves(start, target):
+
+    current_position = list(start)
+    target_position = list(target)
+
+    moves = []
+
+    while current_position != target_position:
+        move = (0, 0)  # No movement initially
+
+        # Check horizontal movement
+        if current_position[0] < target_position[0]:
+            move = (1, 0)  # Move right
+        elif current_position[0] > target_position[0]:
+            move = (-1, 0)  # Move left
+
+        # Check vertical movement
+        if current_position[1] < target_position[1]:
+            move = (move[0], 1)  # Move up
+        elif current_position[1] > target_position[1]:
+            move = (move[0], -1)  # Move down
+
+        current_position[0] += move[0]
+        current_position[1] += move[1]
+
+        moves.append(tuple(current_position))
+
+    return moves
+
 
 # A* Algorithm
 def a_star(start, goal, grid):
     # Helper functions
-    
+
     grid_size = grid.shape
 
     def heuristic(a, b):
@@ -192,10 +237,10 @@ def a_star(start, goal, grid):
             (0, -1),
             (1, 0),
             (-1, 0),
-            # (1,1),
-            # (-1,-1),
-            # (-1,1),
-            # (1,-1),
+            (1,1),
+            (-1,-1),
+            (-1,1),
+            (1,-1),
         ]  # 4-way movement
         valid_neighbors = []
         for dx, dy in neighbors:
@@ -213,7 +258,7 @@ def a_star(start, goal, grid):
     heapq.heappush(frontier, (0, start))
     came_from = {start: None}
     cost_so_far = {start: 0}
-    
+
     # Algorithm loop
     while frontier:
         current_cost, current = heapq.heappop(frontier)
@@ -229,8 +274,6 @@ def a_star(start, goal, grid):
                 heapq.heappush(frontier, (priority, next))
                 came_from[next] = current
 
-    
-    
     # Reconstruct path
     current = goal
     path = []
@@ -239,7 +282,7 @@ def a_star(start, goal, grid):
         current = came_from.get(current)
         if current is None:
             return []
-    path.append(start)
+    # path.append(start)
     path.reverse()
     return path
 

@@ -35,7 +35,6 @@ class RobotBase:
         self.id = id
         self.position = initial_position
         self.orientation = orientation
-        
 
     @property
     def x(self):
@@ -69,14 +68,10 @@ class RobotControl(RobotBase):
     gps: GPS
     compass: Compass
 
-    def __init__(
-        self,
-        robot: Supervisor,
-        speed=1
-    ):
+    def __init__(self, robot: Supervisor, speed=1):
         super().__init__(
             id,
-            [0,0],
+            [0, 0],
             0,
         )
         self.speed = speed
@@ -92,36 +87,42 @@ class RobotControl(RobotBase):
         self.robot_step()
 
         gps: GPS = robot.getDevice("gps")
-        gps.enable(1)
         self.gps = gps
-        self.robot.step()
 
         compass: Compass = robot.getDevice("compass")
-        compass.enable(1)
         self.compass = compass
 
         self.robot.step()
 
-    def set_position_and_rotation(self):
+    def sync(self):
+        self.gps.enable(1)
+        self.robot.step()
         x, y, _ = self.gps.getValues()
-        self.x=x
-        self.y=y
+        self.gps.disable()
 
-        xo,yo,_=self.compass.getValues()
-        oo=np.degrees(np.atan2(xo,yo))
-        
-        if oo<0:
-            oo=360+oo
-        if oo>=360:
-            oo=oo-360
-        self.orientation=oo
+        self.x = x
+        self.y = y
+
+        self.compass.enable(1)
+        self.robot.step()
+        xo, yo, _ = self.compass.getValues()
+        self.compass.disable()
+        oo = np.degrees(np.atan2(xo, yo))
+
+        if oo < 0:
+            oo = 360 + oo
+        if oo >= 360:
+            oo = oo - 360
+
+        self.orientation = oo
 
     def move(self, left_velocity, right_velocity):
-        max_v=6.28
-        self.left_wheel.setVelocity(np.clip(left_velocity * self.speed,-max_v,max_v))
-        self.right_wheel.setVelocity(np.clip(right_velocity * self.speed,-max_v,max_v))
+        max_v = 6.28
+        self.left_wheel.setVelocity(np.clip(left_velocity * self.speed, -max_v, max_v))
+        self.right_wheel.setVelocity(
+            np.clip(right_velocity * self.speed, -max_v, max_v)
+        )
         self.robot_step()
-        self.set_position_and_rotation()
 
     def motor_rotate_left(self):
         self.move(1, 0)
@@ -137,3 +138,57 @@ class RobotControl(RobotBase):
 
     def robot_step(self, timestep=None):
         self.robot.step(timestep)
+
+    def detect_obstacles(self):
+        sensor_tags = [
+            "ps5",
+            "ps6",
+            "ps7",
+            "ps0",
+            "ps1",
+            "ps2",
+        ][::-1]
+
+        (0.03, 234.93, 0.0241),
+        (0.04, 158.03, 0.0287),
+        (0.05, 120, 0.04225),
+        (0.06, 104.09, 0.03065),
+        (0.07, 67.19, 0.04897),
+
+        thresholds =  [150,115,200,200,115,150]
+
+        values = {}
+        s = []
+
+        for tag,thres in zip(sensor_tags,thresholds):
+            ps = self.robot.getDevice(tag)
+            ps.enable(1)
+            self.robot.step()
+            value = ps.getValue()
+            ps.disable()
+            s.append(value)
+
+            values[tag] = 1 if value >= thres else 0
+
+        detected_obs = [0, 0, 0, 0, 0]
+        # left
+        if values["ps5"]:
+            detected_obs[0] = 1
+
+        # right
+        if values["ps2"]:
+            detected_obs[4] = 1
+
+        # mid left
+        if values["ps6"]  :
+            detected_obs[1] = 1
+
+        # mid right
+        if values["ps1"] :
+            detected_obs[3] = 1
+
+        # front
+        if values["ps7"] or values["ps0"] or (values["ps6"]and values["ps1"] ):
+            detected_obs[2] = 1
+
+        return detected_obs[::-1]
