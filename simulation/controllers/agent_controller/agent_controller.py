@@ -116,6 +116,7 @@ class AgentContoller:
         density = 16
         scale = 1 / density
         grid = np.zeros((density, density))
+        trajectory = []
 
         offset = 0.5
 
@@ -158,7 +159,7 @@ class AgentContoller:
                     p[:, 1],
                     "go",
                     label="Waypoints",
-                    markersize=2,
+                    markersize=5,
                 )
 
             obstacles = np.array(np.where(grid == 1)).transpose()
@@ -177,22 +178,25 @@ class AgentContoller:
                 label="Target",
                 markersize=10,
             )
-            tr = np.array(np.where(grid == -1)).transpose()
-            # tr.reverse()
 
-            ax.plot(
-                tr[:, 0],
-                tr[:, 1],
-                f"b+",
-                markersize=5,
-            )
+            prev_step = None
+            for step in trajectory[::-1]:
+                if prev_step is None:
+                    prev_step = step
+                ax.plot(
+                    (step[0], prev_step[0]),  # X values
+                    (step[1], prev_step[1]),  # Y values
+                    linestyle="-",  # Solid line connecting points
+                    color="b",  # Optional: line color, e.g., blue
+                )
+                prev_step = step
 
             ax.plot(
                 current_grid_pos[0],
                 current_grid_pos[1],
                 "bo",
                 label="Robot",
-                markersize=5,
+                markersize=7,
             )
             length = 1
             O_radians = np.deg2rad(self.control.orientation)
@@ -237,7 +241,7 @@ class AgentContoller:
         achievedSubGoal = current_grid_pos
 
         while subGoal is not None:
-            # show_grid()
+            show_grid()
             subTarget = utils.revert_transformation(
                 subGoal,
                 offset,
@@ -246,7 +250,7 @@ class AgentContoller:
             )
 
             obstacles = self.control.detect_obstacles()
-            
+
             self.control.sync()
             alignment = self.get_alignment(subTarget)
             alin_thres = 10 / 180
@@ -264,9 +268,9 @@ class AgentContoller:
                 [x, y],
             )
 
-            hasReachedSubGoal=(posError < posThres or subGoal == current_grid_pos) and grid[
-                subGoal
-            ] != 1
+            hasReachedSubGoal = (
+                posError < posThres or subGoal == current_grid_pos
+            ) and grid[subGoal] != 1
 
             if np.abs(alignment) >= 170 / 180:
                 print("reverse")
@@ -283,6 +287,7 @@ class AgentContoller:
                     subGoal = None
                     continue
                 grid[subGoal] = -1
+                trajectory.append(subGoal)
                 achievedSubGoal = subGoal
                 subGoal = path.pop(0)
                 continue

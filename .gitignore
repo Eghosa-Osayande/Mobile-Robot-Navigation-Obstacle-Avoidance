@@ -5,3 +5,4 @@ refs/
 .arena.wbproj
 .DS_Store
 __pycache__
+positions_cache.py
