@@ -19,7 +19,7 @@ PROTO AgentProto [
       name IS name
       customData IS customData
       supervisor FALSE
-      distance_sensor_numberOfRays 200
+      distance_sensor_numberOfRays 300
       emitter_channel  1 
       turretSlot [
         GPS{

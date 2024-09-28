@@ -1,5 +1,0 @@
-,n_robots,approach,mean_pos_error,max_time,total_energy,timed_out
-0,10,hungarian,0.028,4.864,34.916,False
-1,10,mean_field,0.027,5.344,37.296,False
-2,10,market,0.026,12.224,47.881,False
-3,10,threshold,0.028,10.432,35.058,False

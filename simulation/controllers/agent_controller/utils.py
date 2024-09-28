@@ -227,9 +227,11 @@ def a_star(start, goal, grid):
 
     grid_size = grid.shape
 
-    def heuristic(a, b):
-        # return abs(a[0] - b[0]) + abs(a[1] - b[1])
+    def heuristic1(a, b):
         return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+    
+    def heuristic2(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
     def get_neighbors(pos):
         neighbors = [
@@ -237,10 +239,10 @@ def a_star(start, goal, grid):
             (0, -1),
             (1, 0),
             (-1, 0),
-            (1,1),
-            (-1,-1),
-            (-1,1),
-            (1,-1),
+            # (1,1),
+            # (-1,-1),
+            # (-1,1),
+            # (1,-1),
         ]  # 4-way movement
         valid_neighbors = []
         for dx, dy in neighbors:
@@ -248,7 +250,7 @@ def a_star(start, goal, grid):
             if (
                 0 <= newx < grid_size[0]
                 and 0 <= newy < grid_size[1]
-                and grid[newx, newy] == 0
+                and grid[newx, newy] != 1
             ):
                 valid_neighbors.append((newx, newy))
         return valid_neighbors
@@ -260,29 +262,39 @@ def a_star(start, goal, grid):
     cost_so_far = {start: 0}
 
     # Algorithm loop
-    while frontier:
-        current_cost, current = heapq.heappop(frontier)
-
-        if current == goal:
-            break
-
-        for next in get_neighbors(current):
-            new_cost = cost_so_far[current] + 1  # Assuming uniform cost
-            if next not in cost_so_far or new_cost < cost_so_far[next]:
-                cost_so_far[next] = new_cost
-                priority = new_cost + heuristic(goal, next)
-                heapq.heappush(frontier, (priority, next))
-                came_from[next] = current
-
-    # Reconstruct path
-    current = goal
     path = []
-    while current != start:
-        path.append(current)
-        current = came_from.get(current)
-        if current is None:
-            return []
-    # path.append(start)
-    path.reverse()
+    for heuristic in [heuristic2,heuristic1]:
+        while frontier:
+            current_cost, current = heapq.heappop(frontier)
+
+            if current == goal:
+                break
+
+            for next in get_neighbors(current):
+                new_cost = cost_so_far[current] + 1  # Assuming uniform cost
+                if next not in cost_so_far or new_cost < cost_so_far[next]:
+                    cost_so_far[next] = new_cost
+                    priority = new_cost + heuristic(goal, next)
+                    heapq.heappush(frontier, (priority, next))
+                    came_from[next] = current
+
+
+        # Reconstruct path
+        current = goal
+        
+        while current != start:
+            path.append(current)
+            current = came_from.get(current)
+            if current is None:
+                path=[]
+                break
+        
+        if len(path)!=0:
+            break
+    
+    if len(path)!=0:
+        path.append(start)
+        path.reverse()
+    
     return path
 

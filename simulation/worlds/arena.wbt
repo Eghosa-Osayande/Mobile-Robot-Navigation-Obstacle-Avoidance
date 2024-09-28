@@ -20,12 +20,12 @@ TexturedBackgroundLight {
   castShadows FALSE
 }
 DEF FLOOR RectangleArena {
+  floorTileSize 0.125 0.125
   wallHeight 1e-100
 }
 DEF BOT Robot {
   children [
     Receiver {
-      name  "receiver"
       channel 1
     }
   ]

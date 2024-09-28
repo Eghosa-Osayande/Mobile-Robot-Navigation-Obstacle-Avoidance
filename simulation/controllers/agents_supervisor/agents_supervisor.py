@@ -256,7 +256,7 @@ class Agents_Supervisor:
 arena_size = [1, 1]
 robot = Supervisor()
 
-seed = 38
+seed = 45#48#39
 increment = 1
 
 
@@ -275,3 +275,4 @@ while True:
     supervisor.reset()
     seed += increment
     print("seed ", seed)
+    # break
