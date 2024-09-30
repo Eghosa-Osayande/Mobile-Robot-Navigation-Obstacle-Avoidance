@@ -19,47 +19,8 @@ OBSTACLE_DETECTION_THRESHOLD = 120
 INF = float("inf")
 
 
-class RobotBase:
 
-    position: list[float]
-    orientation: float = 0
-    obstacle_threshold = 1
-    id: int
-
-    def __init__(
-        self,
-        id: int,
-        initial_position,
-        orientation=0,
-    ):
-        self.id = id
-        self.position = initial_position
-        self.orientation = orientation
-
-    @property
-    def x(self):
-        return self.position[0]
-
-    @property
-    def y(self):
-        return self.position[1]
-
-    @x.setter
-    def x(self, v):
-        self.position[0] = v
-
-    @y.setter
-    def y(self, v):
-        self.position[1] = v
-
-    def move(self, left_velocity, right_velocity):
-        pass
-
-    def is_out_of_range(self):
-        pass
-
-
-class RobotControl(RobotBase):
+class RobotControl():
 
     robot: Supervisor
     left_wheel: Motor
@@ -69,15 +30,14 @@ class RobotControl(RobotBase):
     compass: Compass
     isReversing:bool=False
 
-    def __init__(self, robot: Supervisor, speed=1):
-        super().__init__(
-            id,
-            [0, 0],
-            0,
-        )
+    def __init__(self, robot: Supervisor, speed=1,dp=1):
+        self.id = id
+        self.position = [0,0]
+        self.orientation = 0
         self.speed = speed
         self.robot = robot
         self.isReversing=False
+        self.dp=dp
 
         left_wheel: Motor = robot.getDevice("left wheel motor")
         right_wheel: Motor = robot.getDevice("right wheel motor")
@@ -95,6 +55,25 @@ class RobotControl(RobotBase):
         self.compass = compass
 
         self.robot.step()
+
+    @property
+    def x(self):
+        return float(np.round(self.position[0],self.dp))
+
+    @property
+    def y(self):
+        return float(np.round(self.position[1],self.dp))
+
+    def transformPoint(self,point):
+        return (float(np.round(point[0],self.dp)),float(np.round(point[1],self.dp)))
+
+    @x.setter
+    def x(self, v):
+        self.position[0] = v
+
+    @y.setter
+    def y(self, v):
+        self.position[1] = v
 
     def sync(self):
         self.gps.enable(1)
