@@ -1,3 +1,4 @@
+import base64
 import json
 import numpy as np
 import pandas as pd
@@ -6,6 +7,12 @@ import numpy as np
 import json
 from PIL import Image, ImageFont, ImageDraw
 
+
+def encode_base64(input_string):
+    return base64.b64encode(input_string.encode("utf-8")).decode("utf-8")
+
+def decode_base64(base64_string):
+    return base64.b64decode(base64_string.encode("utf-8")).decode("utf-8")
 
 def generate_random_coordinates(
     x_min, x_max, y_min, y_max, n=1, threshold=0.08, padding=0
@@ -188,7 +195,7 @@ class Agents_Supervisor:
         self.step()
         self.started_at = self.supervisor.getTime()
 
-    def insert_robots_and_targets(self):
+    def insert_robots_and_targets(self,**kwargs):
 
         root_node = self.supervisor.getRoot()
         children_field = root_node.getField("children")
@@ -206,7 +213,7 @@ class Agents_Supervisor:
                 translation {x} {y} 0.01
                 rotation 0 0 1 {np.deg2rad(0)}
                 controller "{controllerFile}"
-                customData "{json.dumps([tx,ty])}"
+                customData "{encode_base64(json.dumps({'target':[tx,ty],**kwargs}))}"
                 }}
                 """,
             )
@@ -270,7 +277,7 @@ while True:
         cache_positions=True,
     )
     
-    supervisor.insert_robots_and_targets()
+    supervisor.insert_robots_and_targets(seed=seed)
     supervisor.await_completion()
     supervisor.reset()
     seed += increment

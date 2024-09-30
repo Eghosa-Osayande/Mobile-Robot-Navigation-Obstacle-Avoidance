@@ -1,4 +1,8 @@
+import base64
+import io
 import json
+import multiprocessing
+import threading
 import numpy as np
 from controller import Robot, Emitter
 import robot_control, utils
@@ -9,42 +13,117 @@ import matplotlib.pyplot as plt
 INF = float("inf")
 
 
-def plot_env(ax, robot_pos=None, path=None, obstacles=None):
-    # if ax is None:
-    #     fig = plt.figure()
-    #     ax = fig.add_subplot(1, 1, 1)
+def encode_base64(input_string):
+    return base64.b64encode(input_string.encode("utf-8")).decode("utf-8")
 
-    if path is not None:
+
+def decode_base64(base64_string):
+    return base64.b64decode(base64_string.encode("utf-8")).decode("utf-8")
+
+
+def show_grid(
+    ax,
+    density,
+    orientation,
+    current_grid_pos,
+    goal,
+    path,
+    trajectory,
+    grid,
+):
+
+    ax.clear()
+    ax.plot(
+        np.zeros((density, density)),
+        "wo",
+        markersize=0,
+    )
+
+    p = np.array(path)
+    if len(p) > 0:
         ax.plot(
-            path[:, 0],
-            path[:, 1],
+            p[:, 0],
+            p[:, 1],
             "go",
-            label="Target",
+            label="Waypoints",
             markersize=5,
         )
 
-    if obstacles is not None:
-        ax.plot(
-            obstacles[:, 0],
-            obstacles[:, 1],
-            "go",
-            label="Target",
-            markersize=5,
-        )
+    obstacles = np.array(np.where(grid == 1)).transpose()
+    ax.plot(
+        obstacles[:, 0],
+        obstacles[:, 1],
+        "rx",
+        label="Obstacles",
+        markersize=5,
+    )
 
-    if robot_pos is not None:
+    ax.plot(
+        goal[0],
+        goal[1],
+        "gx",
+        label="Target",
+        markersize=10,
+    )
 
+    prev_step = None
+    for step in trajectory[::-1]:
+        if prev_step is None:
+            prev_step = step
         ax.plot(
-            robot_pos[0],
-            robot_pos[1],
-            "bo",
-            label="Robot",
-            markersize=10,
+            (step[0], prev_step[0]),  # X values
+            (step[1], prev_step[1]),  # Y values
+            linestyle="-",  # Solid line connecting points
+            color="b",  # Optional: line color, e.g., blue
         )
+        prev_step = step
+
+    ax.plot(
+        current_grid_pos[0],
+        current_grid_pos[1],
+        "bo",
+        label="Robot",
+        markersize=7,
+    )
+    length = 1
+    O_radians = np.deg2rad(orientation)
+    x, y = current_grid_pos[0], current_grid_pos[1]
+    x_end = x + length * np.cos(O_radians)
+    y_end = y + length * np.sin(O_radians)
+
+    # Plot the arrow indicating the direction
+    ax.quiver(
+        x,
+        y,
+        x_end - x,
+        y_end - y,
+        angles="xy",
+        scale_units="xy",
+        scale=1,
+        color="r",
+    )
 
     ax.set_aspect("equal")
+    # ax.axis('scaled')
     ax.legend()
-    return ax
+    plt.xticks(
+        np.arange(-0.5, density, 1),
+        labels=[],
+    )
+    plt.yticks(
+        np.arange(-0.5, density, 1),
+        fontsize=8,
+    )
+    ax.set_xlim(-0.5, density)
+    ax.set_ylim(-0.5, density)
+    ax.grid(True)
+
+    ax.figure.savefig(
+        f"renders.png",
+        format="png",
+        bbox_inches="tight",
+        pad_inches=0,
+    )
 
 
 class AgentContoller:
@@ -52,6 +131,7 @@ class AgentContoller:
     robot: Robot
     completed: bool = False
     initial_position = [0, 0]
+    customData: dict = {}
 
     def __init__(
         self,
@@ -67,7 +147,8 @@ class AgentContoller:
 
         self.name = robot.getName()
         targetStr = self.robot.getCustomData()
-        self.target = json.loads(targetStr)
+        self.customData = json.loads(decode_base64(targetStr))
+        self.target = self.customData["target"]
 
     def get_alignment(self, target_pos):
         v = utils.get_alignment_to_target(
@@ -113,7 +194,8 @@ class AgentContoller:
         initial_position = [x, y]
         target = self.target
 
-        density = 16
+        kind = 4
+        density = 30
         scale = 1 / density
         grid = np.zeros((density, density))
         trajectory = []
@@ -131,7 +213,8 @@ class AgentContoller:
             scale=scale,
         )
 
-        path = utils.a_star(current_grid_pos, goal, grid)
+        
+        path = utils.a_star(current_grid_pos, goal, grid, kind)
 
         if len(path) == 0:
             print("No path found")
@@ -143,105 +226,21 @@ class AgentContoller:
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
 
-        def show_grid():
-
-            ax.clear()
-            ax.plot(
-                np.zeros((density, density)),
-                "wo",
-                markersize=0,
-            )
-
-            p = np.array(path)
-            if len(p) > 0:
-                ax.plot(
-                    p[:, 0],
-                    p[:, 1],
-                    "go",
-                    label="Waypoints",
-                    markersize=5,
-                )
-
-            obstacles = np.array(np.where(grid == 1)).transpose()
-            ax.plot(
-                obstacles[:, 0],
-                obstacles[:, 1],
-                "rx",
-                label="Obstacles",
-                markersize=5,
-            )
-
-            ax.plot(
-                goal[0],
-                goal[1],
-                "gx",
-                label="Target",
-                markersize=10,
-            )
-
-            prev_step = None
-            for step in trajectory[::-1]:
-                if prev_step is None:
-                    prev_step = step
-                ax.plot(
-                    (step[0], prev_step[0]),  # X values
-                    (step[1], prev_step[1]),  # Y values
-                    linestyle="-",  # Solid line connecting points
-                    color="b",  # Optional: line color, e.g., blue
-                )
-                prev_step = step
-
-            ax.plot(
-                current_grid_pos[0],
-                current_grid_pos[1],
-                "bo",
-                label="Robot",
-                markersize=7,
-            )
-            length = 1
-            O_radians = np.deg2rad(self.control.orientation)
-            x, y = current_grid_pos[0], current_grid_pos[1]
-            x_end = x + length * np.cos(O_radians)
-            y_end = y + length * np.sin(O_radians)
-
-            # Plot the arrow indicating the direction
-            ax.quiver(
-                x,
-                y,
-                x_end - x,
-                y_end - y,
-                angles="xy",
-                scale_units="xy",
-                scale=1,
-                color="r",
-            )
-
-            ax.set_aspect("equal")
-            # ax.axis('scaled')
-            ax.legend()
-            plt.xticks(
-                np.arange(-0.5, density, 1),
-                labels=[],
-            )
-            plt.yticks(
-                np.arange(-0.5, density, 1),
-                fontsize=8,
-            )
-            ax.set_xlim(-0.5, density)
-            ax.set_ylim(-0.5, density)
-            ax.grid(True)
-
-            fig.savefig(
-                f"renders.png",
-                format="png",
-                bbox_inches="tight",
-                pad_inches=0,
-            )
-
         achievedSubGoal = current_grid_pos
 
+        render = lambda: show_grid(
+            ax,
+            density,
+            self.control.orientation,
+            current_grid_pos,
+            goal,
+            path,
+            trajectory,
+            grid,
+        )
+
         while subGoal is not None:
-            show_grid()
+            # render()
             subTarget = utils.revert_transformation(
                 subGoal,
                 offset,
@@ -253,7 +252,7 @@ class AgentContoller:
 
             self.control.sync()
             alignment = self.get_alignment(subTarget)
-            alin_thres = 10 / 180
+            alin_thres = 5.0 / 180
             x, y = self.control.x, self.control.y
 
             current_grid_pos, robot_rem = utils.apply_transformation(
@@ -296,38 +295,38 @@ class AgentContoller:
 
                 self.control.motor_stop()
 
-                if subGoal != goal and grid[subGoal] == 0:
+                if subGoal != goal and grid[subGoal] != 1:
+                    if grid[subGoal] == -1:
+                        print("will override past position", subGoal)
                     grid[subGoal] = obstacles[0]
 
-                sub_moves = utils.generate_sub_moves(current_grid_pos, subGoal)
+                # sub_moves = utils.generate_sub_moves(current_grid_pos, subGoal)
 
-                if len(sub_moves) > 1:
-                    sub_moves = np.array(sub_moves)
+                # if len(sub_moves) > 1:
+                #     sub_moves = np.array(sub_moves)
 
-                    sub_moves_grid = grid[sub_moves[:, 0], sub_moves[:, 1]]
+                #     sub_moves_grid = grid[sub_moves[:, 0], sub_moves[:, 1]]
 
-                    if sub_moves_grid.sum() > 0:
-                        grid[sub_moves[:, 0], sub_moves[:, 1]] = 1
-                        print("altered")
+                #     if sub_moves_grid.sum() > 0:
+                #         grid[sub_moves[:, 0], sub_moves[:, 1]] = 1
+                #         print("Added sub moves ", sub_moves)
 
-                path_array = np.array([subGoal, *path])
-                path_grid = grid[path_array[:, 0], path_array[:, 1]]
+                path = utils.a_star(achievedSubGoal, goal, grid, kind)
 
-                if path_grid.sum() > 0:
-                    print("Avoid")
+                if len(path) == 0:
+                    print("No path found")
+                    break
 
-                    path = utils.a_star(achievedSubGoal, goal, grid)
-
-                    if len(path) == 0:
-                        print("No path found")
-                        break
-
+                subGoal = path.pop(0)
+                while subGoal == achievedSubGoal and len(path) > 0:
                     subGoal = path.pop(0)
-                    continue
+
+                print("avoid")
+                continue
 
             self.control.move(1, 1)
 
-        show_grid()
+        render()
         self.control.motor_stop()
         e: Emitter = self.robot.getDevice("emitter")
         e.send(self.name)

@@ -141,12 +141,10 @@ class RobotControl(RobotBase):
 
     def detect_obstacles(self):
         sensor_tags = [
-            
             "ps6",
             "ps7",
             "ps0",
             "ps1",
-         
         ][::-1]
 
         (0.03, 234.93, 0.0241),
@@ -155,12 +153,12 @@ class RobotControl(RobotBase):
         (0.06, 104.09, 0.03065),
         (0.07, 67.19, 0.04897),
 
-        thresholds =  [100,100,100,100]
+        thresholds = [250, 100, 100, 250]
 
         values = {}
         s = []
 
-        for tag,thres in zip(sensor_tags,thresholds):
+        for tag, thres in zip(sensor_tags, thresholds):
             ps = self.robot.getDevice(tag)
             ps.enable(1)
             self.robot.step()
@@ -169,11 +167,10 @@ class RobotControl(RobotBase):
             s.append(value)
 
             values[tag] = 1 if value >= thres else 0
-
         detected_obs = [0]
 
         # front
-        if values["ps7"] or values["ps0"] or (values["ps6"]and values["ps1"] ):
+        if values["ps7"] or values["ps0"] or (values["ps6"] and values["ps1"]):
             detected_obs[0] = 1
 
         return detected_obs[::-1]
