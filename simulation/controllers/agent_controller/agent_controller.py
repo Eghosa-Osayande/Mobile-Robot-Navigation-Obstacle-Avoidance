@@ -22,14 +22,14 @@ def decode_base64(base64_string):
 
 
 def show_grid(
-    ax,
     orientation,
     current_grid_pos,
     goal,
     path,
     grid,
 ):
-
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
     ax.clear()
 
     p = np.array(path)
@@ -42,19 +42,22 @@ def show_grid(
             markersize=5,
         )
     density = 0
+    
+    labels = {
+        1: "Obstacles",
+        -1: "Trajectory",
+    }
+    markers = {1: "rx", -1: "b."}
     for point, value in grid.items():
-        labels = {
-            1: "Obstacles",
-            -1: "Trajectory",
-        }
-        markers = {1: "rx", -1: "b."}
+
         ax.plot(
             point[0],
             point[1],
             markers.get(value),
-            labels.get(value),
+            label=labels.get(value),
             markersize=5,
         )
+        labels.pop(value,None)
         density = np.max(np.abs([density, *point, *goal, *current_grid_pos]))
 
     ax.plot(
@@ -92,20 +95,28 @@ def show_grid(
     )
 
     ax.set_aspect("equal")
-    # ax.legend()
+    ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
 
-    start,end=-(density+0.5),(density+0.5)
+    start, end = -(density + 0.5), (density + 0.5)
 
     plt.xticks(
-        np.arange(start,end, 1),
+        np.arange(start, end, 1),
         labels=[],
     )
     plt.yticks(
-        np.arange(start,end, 1),
+        np.arange(start, end, 1),
         fontsize=8,
     )
-    ax.set_xlim(start,end,)
-    ax.set_ylim(start,end,)
+    # plt.tight_layout()
+
+    ax.set_xlim(
+        start,
+        end,
+    )
+    ax.set_ylim(
+        start,
+        end,
+    )
 
     ax.grid(True)
 
@@ -187,7 +198,7 @@ class AgentContoller:
 
         kind = 4
 
-        scale = 1 / 60
+        scale = 1 / 30
         grid = {}
         limits = [(-15, 15), (-15, 15)]
 
@@ -219,13 +230,9 @@ class AgentContoller:
         subGoal = path.pop(0)
         self.control.speed = 1
 
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-
         achievedSubGoal = current_grid_pos
 
         render = lambda: show_grid(
-            ax,
             self.control.orientation,
             current_grid_pos,
             goal,
