@@ -67,6 +67,7 @@ class RobotControl(RobotBase):
 
     gps: GPS
     compass: Compass
+    isReversing:bool=False
 
     def __init__(self, robot: Supervisor, speed=1):
         super().__init__(
@@ -76,6 +77,7 @@ class RobotControl(RobotBase):
         )
         self.speed = speed
         self.robot = robot
+        self.isReversing=False
 
         left_wheel: Motor = robot.getDevice("left wheel motor")
         right_wheel: Motor = robot.getDevice("right wheel motor")
@@ -122,6 +124,7 @@ class RobotControl(RobotBase):
         self.right_wheel.setVelocity(
             np.clip(right_velocity * self.speed, -max_v, max_v)
         )
+        self.isReversing=(left_velocity,right_velocity)==(-1,-1)
         self.robot_step()
 
     def motor_rotate_left(self):
@@ -140,12 +143,7 @@ class RobotControl(RobotBase):
         self.robot.step(timestep)
 
     def detect_obstacles(self):
-        sensor_tags = [
-            "ps6",
-            "ps7",
-            "ps0",
-            "ps1",
-        ][::-1]
+       
 
         (0.03, 234.93, 0.0241),
         (0.04, 158.03, 0.0287),
@@ -153,24 +151,34 @@ class RobotControl(RobotBase):
         (0.06, 104.09, 0.03065),
         (0.07, 67.19, 0.04897),
 
-        thresholds = [250, 100, 100, 250]
+        thresholds = {
+            "ps6": 250,
+            "ps7": 100,
+            "ps0": 100,
+            "ps1": 250,
+            "ps3":100, 
+            "ps4":100,
+        }
 
         values = {}
-        s = []
+        actualValues = []
 
-        for tag, thres in zip(sensor_tags, thresholds):
+        for tag, thres in thresholds.items():
             ps = self.robot.getDevice(tag)
             ps.enable(1)
             self.robot.step()
             value = ps.getValue()
             ps.disable()
-            s.append(value)
-
+            actualValues.append(value)
             values[tag] = 1 if value >= thres else 0
-        detected_obs = [0]
+        
+        detected_obs = [0,0]
 
         # front
         if values["ps7"] or values["ps0"] or (values["ps6"] and values["ps1"]):
             detected_obs[0] = 1
-
-        return detected_obs[::-1]
+        # back
+        if values["ps3"] or values["ps4"]:
+            detected_obs[1] = 1
+        
+        return detected_obs

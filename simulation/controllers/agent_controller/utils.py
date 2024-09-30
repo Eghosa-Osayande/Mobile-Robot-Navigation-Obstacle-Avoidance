@@ -177,7 +177,7 @@ def get_alignment_to_target(orientation, current_coordinate, destination_coordin
     return np.degrees(theta) - orientation
 
 
-def apply_transformation(cord, offset=0, scale=1):
+def point_to_index(cord, offset=0, scale=1):
     x, y = cord
 
     pos = (int((x + offset) // scale), int((y + offset) // scale))
@@ -186,7 +186,7 @@ def apply_transformation(cord, offset=0, scale=1):
     return pos, remainders
 
 
-def revert_transformation(cord, offset=0, scale=1, remainders=(0, 0)):
+def index_to_point(cord, offset=0, scale=1, remainders=(0, 0)):
     xx = (cord[0] * scale) - offset + remainders[0]
     yy = (cord[1] * scale) - offset + remainders[1]
     return xx, yy
@@ -223,10 +223,13 @@ def generate_sub_moves(start, target):
 
 
 # A* Algorithm
-def a_star(start, goal, grid, kind):
-    # Helper functions
-
-    grid_size = grid.shape
+def a_star(
+    start,
+    goal,
+    grid,
+    kind,
+    limits=[(-float("inf"), float("inf")), (-float("inf"), float("inf"))],
+):
 
     def heuristic1(a, b):
         return np.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
@@ -238,10 +241,11 @@ def a_star(start, goal, grid, kind):
         valid_neighbors = []
         for dx, dy in neighbors:
             newx, newy = pos[0] + dx, pos[1] + dy
+
             if (
-                0 <= newx < grid_size[0]
-                and 0 <= newy < grid_size[1]
-                and grid[newx, newy] != 1
+                limits[0][0] <= newx < limits[0][1]
+                and limits[1][0] <= newy < limits[1][1]
+                and grid.get((newx, newy)) != 1
             ):
                 valid_neighbors.append((newx, newy))
         return valid_neighbors
@@ -272,13 +276,14 @@ def a_star(start, goal, grid, kind):
             (1, -1),
         ],
     }
+
     movement_kind = {
         4: heuristic2,  # 4-way movement
         8: heuristic1,
     }
 
     heuristic = movement_kind[kind]
-    
+
     while frontier:
         current_cost, current = heapq.heappop(frontier)
 
