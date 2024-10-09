@@ -11,8 +11,8 @@ WorldInfo {
   optimalThreadCount 8
 }
 Viewpoint {
-  orientation -0.5773502691896258 0.5773502691896258 0.5773502691896258 2.0944
-  position -6.873862336574464e-06 -6.873881774616378e-06 2
+  orientation -0.5773502691896257 0.5773502691896257 0.5773502691896257 2.0943245915045035
+  position -4.886707084077338e-06 -4.886508152721423e-06 2.120036108204289
 }
 TexturedBackground {
 }
@@ -20,8 +20,7 @@ TexturedBackgroundLight {
   castShadows FALSE
 }
 DEF FLOOR RectangleArena {
-  floorTileSize 0.125 0.125
-  wallHeight 1e-100
+  floorTileSize 2.2 2.2
 }
 DEF BOT Robot {
   children [

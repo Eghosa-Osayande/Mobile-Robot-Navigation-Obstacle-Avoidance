@@ -1,4 +1,5 @@
 .env
+.venv
 simulation/controllers/controller/
 .ipynb_checkpoints/
 refs/

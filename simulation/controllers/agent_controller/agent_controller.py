@@ -1,8 +1,6 @@
 import base64
-import io
 import json
-import multiprocessing
-import threading
+
 import numpy as np
 from controller import Robot, Emitter
 import robot_control, utils
@@ -21,15 +19,17 @@ def decode_base64(base64_string):
     return base64.b64decode(base64_string.encode("utf-8")).decode("utf-8")
 
 
+
 def show_grid(
+    ax,
     orientation,
     current_grid_pos,
     goal,
     path,
     grid,
-):
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
+    fileName="render.png",
+):  
+
     ax.clear()
 
     p = np.array(path)
@@ -42,7 +42,7 @@ def show_grid(
             markersize=5,
         )
     density = 0
-    
+
     labels = {
         1: "Obstacles",
         -1: "Trajectory",
@@ -57,7 +57,7 @@ def show_grid(
             label=labels.get(value),
             markersize=5,
         )
-        labels.pop(value,None)
+        labels.pop(value, None)
         density = np.max(np.abs([density, *point, *goal, *current_grid_pos]))
 
     ax.plot(
@@ -120,13 +120,14 @@ def show_grid(
 
     ax.grid(True)
 
+    
+
     ax.figure.savefig(
-        f"renders.png",
+        fileName,
         format="png",
         bbox_inches="tight",
         pad_inches=0,
     )
-
 
 class AgentContoller:
 
@@ -144,13 +145,16 @@ class AgentContoller:
 
         self.control = robot_control.RobotControl(
             robot,
-            speed=6,
+            speed=0.1,
         )
 
         self.name = robot.getName()
         targetStr = self.robot.getCustomData()
         self.customData = json.loads(decode_base64(targetStr))
         self.target = self.customData["target"]
+        self.seed = str(self.customData.get("seed"))
+        self.kind = int(self.customData.get("kind"))
+        self.scale = float(self.customData.get("scale"))
 
     def get_alignment(self, target_pos):
         v = utils.get_alignment_to_target(
@@ -163,10 +167,7 @@ class AgentContoller:
         )
 
         v = v % 360
-        if v > 180:
-            v = -(180 - (v - 180))
-
-        return v / 180
+        return v
 
     def get_distance_to_target(self, target_pos):
 
@@ -190,72 +191,91 @@ class AgentContoller:
         return d * factor
 
     def move_to_target(self):
-
         self.control.sync()
+        # x,y <- get robot current position
         x, y = self.control.x, self.control.y
         initial_position = [x, y]
         target = self.target
 
-        kind = 4
+        kind = self.kind
 
-        scale = 1 / 30
-        grid = {}
+        # scaale <- set the scale factor for mapping robot position to grid index
+        scale = 1 / self.scale
+
+        # gridMap <- initialise map to hold robot experience at explored grid index
+        gridMap = {}
         limits = [(-15, 15), (-15, 15)]
 
         offset = 0.0
 
+        # current_grid_pos <- convert the robot starting position to equivalent grid index
         current_grid_pos, robot_rem = utils.point_to_index(
             initial_position,
             offset=offset,
             scale=scale,
         )
+
+        # goal <- convert the target position to equivalent grid index
         goal, target_rem = utils.point_to_index(
             target,
             offset=offset,
             scale=scale,
         )
 
+        # path <- find initial path using a star from start index to target index
         path = utils.a_star(
             current_grid_pos,
             goal,
-            grid,
+            gridMap,
             kind,
             # limits=limits,
         )
+
+        # if len of path is zero END
 
         if len(path) == 0:
             print("No path found")
             return
 
+        # set the robots current grid index to -1
+        lastAchievedSubGoal = path.pop(0)
+
+        # subGoal <- get the first sub goal from the a star path
         subGoal = path.pop(0)
-        self.control.speed = 1
+        # subTarget <- convert subGoal to in cartesion cordinte
+        subTarget = utils.index_to_point(
+            subGoal,
+            offset,
+            scale,
+            remainders=target_rem,
+        )
 
-        achievedSubGoal = current_grid_pos
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
 
-        render = lambda: show_grid(
+        render = lambda fileName="": show_grid(
+            ax,
             self.control.orientation,
             current_grid_pos,
             goal,
             path,
-            grid,
+            gridMap,
         )
 
+        # while sub_goal has a value
+        fileName=f"final-{self.seed}-k{kind}-s{self.scale}"
+
+        render(fileName=fileName)
+        timestep=0
         while subGoal is not None:
-            # render()
-            subTarget = utils.index_to_point(
-                subGoal,
-                offset,
-                scale,
-                remainders=target_rem,
-            )
-
-            obstacles = self.control.detect_obstacles()
-
+            timestep+=1
+            if timestep%10 ==0:
+                render(fileName=fileName)
             self.control.sync()
-            alignment = self.get_alignment(subTarget)
-            alin_thres = 5.0 / 180
+            # x,y <- get robot current position
             x, y = self.control.x, self.control.y
 
+            # current_grid_pos <- convert x,y to grid index
             current_grid_pos, robot_rem = utils.point_to_index(
                 [x, y],
                 offset=offset,
@@ -268,78 +288,123 @@ class AgentContoller:
                 [x, y],
             )
 
+            # check if robot has reached subGoal
             hasReachedSubGoal = (
                 posError < posThres or subGoal == current_grid_pos
-            ) and grid.get(subGoal) != 1
+            ) and gridMap.get(subGoal) != 1
 
-            if np.abs(alignment) >= 170 / 180:
-                print("reverse")
-                self.control.move(-1, -1)
-                # continue
-
-            elif np.abs(alignment) >= alin_thres and not hasReachedSubGoal:
-                factor = alignment / np.abs(alignment)
-                self.control.move(-1 * factor, 1 * factor)
-                continue
+            # if yes
 
             if hasReachedSubGoal:
+                # if len of path is zero
+                # assign subGoal to no value
                 if len(path) == 0:
                     subGoal = None
                     continue
-                grid[subGoal] = -1
-                achievedSubGoal = subGoal
+
+                # set the grid index to -1
+                if True:  # and gridMap.get(subGoal) is None:
+                    gridMap[subGoal] = -1
+
+                # lastAchievedSubGoal <- subgoal
+                lastAchievedSubGoal = subGoal
+
+                # subGoal <- pop the next subgoal from the path list
                 subGoal = path.pop(0)
+
+                # subTarget <- convert subGoal to in cartesion cordinte
+                subTarget = utils.index_to_point(
+                    subGoal,
+                    offset,
+                    scale,
+                    remainders=target_rem,
+                )
+
                 continue
 
+            # alignment <- get robot alignment to target
+            alignment = self.get_alignment(subTarget)
+
+            # if alignment < 0 turn right
+            # if alignment > 0 turn left
+            # continue
+            # print(current_grid_pos,subGoal,alignment)
+
+                
+
+            if alignment > 10:
+                if alignment >= 170 and alignment <=  190:
+                    print("reverse")
+                    self.control.move(-1, -1)
+                    continue
+                factor = 1
+                if alignment > 180:
+                    factor = -1
+                self.control.speed = 1
+                self.control.move(-1 * factor, 1 * factor)
+                continue
+
+            # obstacles <- detect obstacles
+            obstacles = self.control.detect_obstacles()
+
+            # if obstacle in forward path
             if (
                 self.control.isReversing == True
                 and obstacles[1] == 1
                 or self.control.isReversing == False
                 and obstacles[0] == 1
             ):
-
+                # stop robot
                 self.control.motor_stop()
 
-                if subGoal != goal and grid.get(subGoal) != 1:
-                    if grid.get(subGoal) == -1:
-                        print("will override past position", subGoal)
+                # subGoal <- set grid cell with index == subGoal to 1
+                if subGoal != goal:  # and gridMap.get(subGoal) is None:
+                    # if gridMap.get(subGoal) == -1:
+                    #     print("will override past position", subGoal)
 
-                    grid[subGoal] = 1
+                    gridMap[subGoal] = 1
 
-                # sub_moves = utils.generate_sub_moves(current_grid_pos, subGoal)
-
-                # if len(sub_moves) > 1:
-                #     sub_moves = np.array(sub_moves)
-
-                #     sub_moves_grid = grid[sub_moves[:, 0], sub_moves[:, 1]]
-
-                #     if sub_moves_grid.sum() > 0:
-                #         grid[sub_moves[:, 0], sub_moves[:, 1]] = 1
-                #         print("Added sub moves ", sub_moves)
-
+                # path <- recompute astar path without grid cells with value == 1
                 path = utils.a_star(
-                    achievedSubGoal,
+                    lastAchievedSubGoal,
                     goal,
-                    grid,
+                    gridMap,
                     kind,
                     # limits=limits,
                 )
+
+                # if len of path == 0 , break, no path found
 
                 if len(path) == 0:
                     print("No path found")
                     break
 
+                # subGoal <- pop the next subgoal from the path list
                 subGoal = path.pop(0)
-                while subGoal == achievedSubGoal and len(path) > 0:
+
+                # continue
+
+                while subGoal == lastAchievedSubGoal and len(path) > 0:
                     subGoal = path.pop(0)
 
+                # subTarget <- convert subGoal to in cartesion cordinte
+                subTarget = utils.index_to_point(
+                    subGoal,
+                    offset,
+                    scale,
+                    remainders=target_rem,
+                )
+                print(current_grid_pos, subGoal, gridMap.get(subGoal))
+                render(fileName=fileName)
                 print("avoid")
                 continue
 
+            # move forward
             if not self.control.isReversing:
+                self.control.speed = 5
                 self.control.move(1, 1)
-
-        render()
+        # stop robot
+        render(fileName=fileName)
         self.control.motor_stop()
         e: Emitter = self.robot.getDevice("emitter")
         e.send(self.name)

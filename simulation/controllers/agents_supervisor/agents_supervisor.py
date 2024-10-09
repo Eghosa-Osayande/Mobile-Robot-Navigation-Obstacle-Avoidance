@@ -11,8 +11,10 @@ from PIL import Image, ImageFont, ImageDraw
 def encode_base64(input_string):
     return base64.b64encode(input_string.encode("utf-8")).decode("utf-8")
 
+
 def decode_base64(base64_string):
     return base64.b64decode(base64_string.encode("utf-8")).decode("utf-8")
+
 
 def generate_random_coordinates(
     x_min, x_max, y_min, y_max, n=1, threshold=0.08, padding=0
@@ -195,7 +197,7 @@ class Agents_Supervisor:
         self.step()
         self.started_at = self.supervisor.getTime()
 
-    def insert_robots_and_targets(self,**kwargs):
+    def insert_robots_and_targets(self, **kwargs):
 
         root_node = self.supervisor.getRoot()
         children_field = root_node.getField("children")
@@ -263,23 +265,32 @@ class Agents_Supervisor:
 arena_size = [1, 1]
 robot = Supervisor()
 
-seed = 45#48#39
-increment = 1
+seeds = [45, 46, 48, 49]
+scales = [30]
 
+for seed in seeds:
+    # seed=48
+    kind = 8 # 4 or 8 way movement
+    for scale in scales:
+        np.random.seed(seed)
+        supervisor = Agents_Supervisor(
+            robot,
+            n_robots=1,
+            arena_size=np.asarray(arena_size),
+            n_obstacles=20,
+            cache_positions=False,
+            # target_positions=[(0.4,0)],
+            # robot_positions=[(-0.4,0)],
+            # obstacle_positions=[(0,0)]
+        )
 
-while True:
-    np.random.seed(seed)
-    supervisor = Agents_Supervisor(
-        robot,
-        n_robots=1,
-        arena_size=np.asarray(arena_size),
-        n_obstacles=20,
-        cache_positions=True,
-    )
-    
-    supervisor.insert_robots_and_targets(seed=seed)
-    supervisor.await_completion()
-    supervisor.reset()
-    seed += increment
-    print("seed ", seed)
-    # break
+        supervisor.insert_robots_and_targets(
+            seed=seed,
+            kind=kind,
+            scale=scale,
+        )
+        supervisor.await_completion()
+        robot.exportImage(f"final-{seed}-k{kind}-s{scale}.png", 100)
+        supervisor.reset()
+        print("seed ", seed)
+        # break

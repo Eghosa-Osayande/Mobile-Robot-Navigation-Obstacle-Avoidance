@@ -8,11 +8,37 @@ EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/project
 PROTO ObstacleProto [
   field SFVec3f translation 0 0 0 # Is `Pose.translation`.
   field SFString name "e-puck" # Is `Solid.name`.
+  #field SFFloat radius 0.05
+  #field SFInt32 subdivision 36
 ]
 {
+
   Can {
   translation IS translation
   name IS name
  
 }
+#   Solid {
+#     translation IS translation
+#     name IS name
+#   children [
+#     DEF OBS Shape {
+#       appearance Appearance {
+#         material Material {
+#           diffuseColor 0 0 0
+#           shininess 0
+#         }
+#       }
+#       geometry Cylinder {
+#         height 0.1
+#         radius IS radius
+#         subdivision IS subdivision
+#       }
+#     }
+#   ]
+#   boundingObject USE OBS
+#   physics Physics {
+#   }
+# }
+
 }
