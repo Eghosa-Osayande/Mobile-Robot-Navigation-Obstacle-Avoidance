@@ -3,6 +3,8 @@
 ## Demo Video
 https://github.com/user-attachments/assets/161f5343-562c-4861-8d31-9a1021e26b8d
 
+[Watch Here](https://drive.google.com/file/d/1Ep1s77rNZkVpbKZDhtpPTr_egyiuKuAY/view?usp=sharing)
+
 ## Abstract
 This work presents an algorithmic framework for navigating mobile robots with location-based operational goals in unknown terrain, ensuring obstacle avoidance along the way. The core of the algorithm involves mapping the robot’s environment and continually updating this map based on the robot’s experiences at various locations. This real-time map is represented as a grid, where each cell corresponds to a specific area of the operating arena.
 
